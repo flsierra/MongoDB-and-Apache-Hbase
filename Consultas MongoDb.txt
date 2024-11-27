@@ -1,0 +1,79 @@
+Creación de la colección en MongoDb
+db.Clientes.insertOne({
+    clienteID: i,
+    nombre: `Cliente ${i}`,
+    email: `cliente${i}@ejemplo.com`,
+    telefono: `12345678${String(i).padStart(2, '0')}`,
+    direccion: `Calle ${i}, Ciudad ${i % 10}`,
+    transacciones: Array.from({ length: Math.floor(Math.random() * 5) + 1 }, (_, j) => ({
+        transaccionID: `${i}-${j}`,
+        fecha: new Date(2024, Math.floor(Math.random() * 12), Math.floor(Math.random() * 28) + 1),
+        monto: Math.random() * 1000,
+        metodoPago: ["Efectivo", "Tarjeta", "Transferencia"][Math.floor(Math.random() * 3)]
+    }))
+});
+
+----------------
+Insert
+{
+  "_id": {
+    "clienteID":"101",
+    "nombre":"Laura Mancipe",
+    "email":"lau@exm.com",
+    "telefono":"12345",
+    "direccion":"Cale Falsa 123",
+    "transacciones":[{
+      "trasaccionID":"101-1", "fecha":"2024-11-26","monto": 500.00,
+      "metodoPago":"Efectivo"
+    }  
+    ]
+  }
+}
+-----------
+Update
+db.Clientes.updateMany(
+    { telefono: /^098/ },
+    { $set: { telefono: "099" } }
+);
+-----------
+Delet
+db.Clientes.deleteOne({ clienteID: 101 });
+-----------
+Filtros con Fechas
+db.Clientes.find({
+    "transacciones.fecha": { $gt: new Date("2024-07-01T00:00:00Z") }
+});
+-----------
+Operadores con selección de campos
+db.Clientes.find({}, { "nombre": 1, "telefono": 1, "_id": 0 });
+-------
+Contar el Número de Clientes en la colección
+db.Clientes.aggregate([
+    { $count: "totalClientes" }
+]);
+-----------
+Sumar el monto total de todas las transacciones
+db.Clientes.aggregate([
+    { $unwind: "$transacciones" },
+    { $group: { _id: null, totalMonto: { $sum: "$transacciones.monto" } } }
+]);
+-----
+Promediar el monto de todas las transacciones por cliente
+db.Clientes.aggregate([
+    { $unwind: "$transacciones" },
+    { $group: {
+        _id: "25",
+        promedioMonto: { $avg: "$transacciones.monto" }
+    }}
+]);
+------------
+Obtener el máximo y mínimo de las transacciones de cada cliente
+db.Clientes.aggregate([
+    { $unwind: "$transacciones" },
+    { $group: {
+        _id: "53",
+        maxMonto: { $max: "$transacciones.monto" },
+        minMonto: { $min: "$transacciones.monto" }
+    }}
+]);
+

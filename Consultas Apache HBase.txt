@@ -1,0 +1,102 @@
+import happybase
+import pandas as pd
+
+try:
+    # 1. Establecer conexión con HBase
+    connection = happybase.Connection('localhost')
+    print("Conexión establecida con HBase")
+
+    # 2. Crear la tabla con las familias de columnas
+    table_name = 'used_cars'
+    families = {
+        'car_info': dict(),  # Información básica del coche
+        'car_specs': dict(),  # Especificaciones del coche
+        'sales_info': dict(),  # Información de ventas
+        'car_condition': dict()  # Estado del vehículo
+    }
+
+    # Eliminar la tabla si ya existe
+    if table_name.encode() in connection.tables():
+        print(f"Eliminando tabla existente - {table_name}")
+        connection.delete_table(table_name, disable=True)
+
+    # Crear nueva tabla
+    connection.create_table(table_name, families)
+    table = connection.table(table_name)
+    print(f"Tabla '{table_name}' creada exitosamente")
+
+    # 3. Cargar datos del CSV
+    car_data = pd.read_csv('Car_details_v3.csv', sep=',')  # Asegúrate de que el separador sea correcto
+
+    # Iterar sobre el DataFrame usando el índice
+    for index, row in car_data.iterrows():
+        # Generar row key basado en el índice
+        row_key = f'car_{index}'.encode()
+
+        # Organizar los datos en familias de columnas
+        data_dict = {
+            b'car_info:name': str(row['name']).encode(),
+            b'car_info:year': str(row['year']).encode(),
+            b'car_info:transmission': str(row['transmission']).encode(),
+            b'car_info:fuel': str(row['fuel']).encode(),
+
+            b'car_specs:engine': str(row['engine']).encode(),
+            b'car_specs:max_power': str(row['max_power']).encode(),
+            b'car_specs:torque': str(row['torque']).encode(),
+            b'car_specs:seats': str(row['seats']).encode(),
+            b'car_specs:mileage': str(row['mileage']).encode(),
+
+            b'sales_info:selling_price': str(row['selling_price']).encode(),
+            b'sales_info:seller_type': str(row['seller_type']).encode(),
+
+            b'car_condition:km_driven': str(row['km_driven']).encode(),
+            b'car_condition:owner': str(row['owner']).encode()
+        }
+
+        table.put(row_key, data_dict)
+
+    print("Datos cargados exitosamente")
+  # 4. Consultas y Análisis de Datos
+
+    # a. Mostrar los primeros 3 registros
+    print("\n=== Primeros 3 registros en la tabla ===")
+    count = 0
+    for key, data in table.scan():
+        if count < 3:
+            print(f"\nCoche ID: {key.decode()}")
+            print(f"Nombre: {data[b'car_info:name'].decode()}")
+            print(f"Año: {data[b'car_info:year'].decode()}")
+            print(f"Precio: {data[b'sales_info:selling_price'].decode()}")
+            count += 1
+
+    # b. Buscar coches por precio menor a 50000
+    print("\n=== Coches con precio menor a 50000 ===")
+    for key, data in table.scan():
+        if int(data[b'sales_info:selling_price'].decode()) < 50000:
+            print(f"\nCoche ID: {key.decode()}")
+            print(f"Nombre: {data[b'car_info:name'].decode()}")
+            print(f"Precio: {data[b'sales_info:selling_price'].decode()}")
+
+    # c. Análisis por propietario
+    print("\n=== Coches por tipo de propietario ===")
+    owner_stats = {}
+    for key, data in table.scan():
+        owner = data[b'car_condition:owner'].decode()
+        owner_stats[owner] = owner_stats.get(owner, 0) + 1
+
+    for owner, count in owner_stats.items():
+        print(f"{owner}: {count} coches")
+
+    # 5. Actualizar precio de un coche específico
+    print("\n=== Actualizar precio de un coche ===")
+    record_to_update = 'car_0'
+    new_price = 460000
+    table.put(record_to_update.encode(), {b'sales_info:selling_price': str(new_price).encode()})
+    print(f"Precio actualizado para el coche ID: {record_to_update}")
+
+except Exception as e:
+    print(f"Error: {str(e)}")
+
+finally:
+    # Cerrar la conexión
+    connection.close()
